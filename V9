@@ -1,0 +1,33 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Academic Command Center v9</title><style>
+body{font-family:Arial,sans-serif;background:#f3f4f6;margin:20px} .card{background:white;padding:12px;margin:10px 0;border:1px solid #ccc;border-radius:8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px} input,select,button{padding:8px} .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.day{min-height:90px;border:1px solid #ccc;padding:4px;cursor:pointer}.low{background:#dcfce7}.med{background:#fde68a}.high{background:#fecaca}
+</style></head><body>
+<h1>Academic Command Center v9</h1>
+<div class='card'><div class='grid'>
+<div><label>Project Name</label><input id='name'></div>
+<div><label>Course</label><input id='course'></div>
+<div><label>Type</label><select id='type'><option>Lesson Plan</option><option>Research Paper</option><option>Presentation</option><option>Custom</option></select></div>
+<div><label>Due Date</label><input id='due' type='date'></div>
+</div><button id='createBtn'>Create Project</button><button id='backupBtn'>Backup JSON</button><button id='restoreBtn'>Restore JSON</button><button id='csvBtn'>Export CSV</button><input type='file' id='restoreFile' style='display:none'></div>
+<div class='card'><label>Search</label><input id='search'></div>
+<div class='card'><div id='stats'></div></div>
+<div class='card'><button id='prev'>◀</button><span id='monthLbl'></span><button id='next'>▶</button><div id='calendar'></div><div id='details'>Click a day</div></div>
+<div class='card'><h3>Projects</h3><div id='projects'></div></div>
+<script>
+const KEY='ACCV9'; let data=JSON.parse(localStorage.getItem(KEY)||'{"projects":[],"milestones":[]}'); let view=new Date();
+const templates={'Lesson Plan':['Target','Engage','I Do','We Do','You Do','Assessment'],'Research Paper':['Topic','Research','Outline','Draft','Revise','Submit'],'Presentation':['Research','Slides','Practice','Present'],'Custom':['Start','Work','Finish']};
+function save(){localStorage.setItem(KEY,JSON.stringify(data));}
+function render(){document.getElementById('stats').textContent=`Projects ${data.projects.length} | Milestones ${data.milestones.length}`; let q=document.getElementById('search').value.toLowerCase(); let p=document.getElementById('projects'); p.innerHTML=''; data.projects.filter(x=>x.name.toLowerCase().includes(q)).forEach(pr=>{let d=document.createElement('div'); d.innerHTML=`<b>${pr.name}</b> (${pr.course}) <button data-id='${pr.id}'>Delete</button>`; p.appendChild(d);}); document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{let id=b.dataset.id; data.projects=data.projects.filter(x=>x.id!=id); data.milestones=data.milestones.filter(x=>x.projectId!=id); save(); render();}); renderCal();}
+function renderCal(){let y=view.getFullYear(),m=view.getMonth(); document.getElementById('monthLbl').textContent=view.toLocaleString(undefined,{month:'long',year:'numeric'}); let first=new Date(y,m,1), last=new Date(y,m+1,0); let h='<div class="calendar">'; ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>h+='<div><b>'+d+'</b></div>'); for(let i=0;i<first.getDay();i++) h+='<div></div>'; for(let day=1; day<=last.getDate(); day++){ let ds=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; let items=data.milestones.filter(x=>x.date===ds); let c='day'; if(items.length==1)c+=' low'; else if(items.length==2)c+=' med'; else if(items.length>2)c+=' high'; h+=`<div class='${c}' data-date='${ds}'><b>${day}</b><br>${items.slice(0,2).map(i=>i.project).join('<br>')}</div>`;} h+='</div>'; document.getElementById('calendar').innerHTML=h; document.querySelectorAll('[data-date]').forEach(d=>d.onclick=()=>{let ds=d.dataset.date; let items=data.milestones.filter(x=>x.date===ds); document.getElementById('details').innerHTML='<b>'+ds+'</b><br>'+(items.map(i=>i.project+' → '+i.step).join('<br>')||'No items');});}
+
+ document.getElementById('createBtn').addEventListener('click',()=>{let name=document.getElementById('name').value.trim(); let course=document.getElementById('course').value.trim(); let type=document.getElementById('type').value; let due=document.getElementById('due').value; if(!name||!due){alert('Enter project and due date');return;} let id=Date.now().toString(); data.projects.push({id,name,course,type,due}); let total=Math.max(1,Math.round((new Date(due)-new Date())/86400000)); let steps=templates[type]||templates.Custom; steps.forEach((s,i)=>{let d=new Date(); d.setDate(d.getDate()+Math.round(total*(i/(steps.length-1||1)))); data.milestones.push({projectId:id,project:name,step:s,date:d.toISOString().split('T')[0]});}); save(); render();});
+ document.getElementById('backupBtn').addEventListener('click',()=>{let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); a.download='accv9_backup.json'; a.click();});
+ document.getElementById('restoreBtn').addEventListener('click',()=>document.getElementById('restoreFile').click());
+ document.getElementById('restoreFile').addEventListener('change',e=>{let f=e.target.files[0]; if(!f)return; let r=new FileReader(); r.onload=x=>{data=JSON.parse(x.target.result); save(); render();}; r.readAsText(f);});
+ document.getElementById('csvBtn').addEventListener('click',()=>{let csv='Project,Step,Date
+'; data.milestones.forEach(m=>csv+=`${m.project},${m.step},${m.date}
+`); let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv])); a.download='accv9.csv'; a.click();});
+ document.getElementById('search').addEventListener('input',render);
+ document.getElementById('prev').addEventListener('click',()=>{view.setMonth(view.getMonth()-1); renderCal();});
+ document.getElementById('next').addEventListener('click',()=>{view.setMonth(view.getMonth()+1); renderCal();});
+ render();
+</script></body></html>
